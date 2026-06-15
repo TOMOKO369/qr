@@ -2064,13 +2064,20 @@ function renderHistory(filter = 'all') {
     }
   });
 
-  // Click to reuse
+  // Click to reuse (attach event listeners)
   list.querySelectorAll('.history-item').forEach(el => {
-    el.addEventListener('click', () => {
-      const url = el.dataset.url;
-      urlInput.value = url;
+    el.addEventListener('click', function() {
+      const url = this.dataset.url;
+      if (!url) return;
+      
+      // Populate form
+      const input = document.getElementById('urlInput');
+      if (input) input.value = url;
+      
       state.qrUrl = url;
-      document.getElementById('resultUrlText').textContent = url;
+      const resultText = document.getElementById('resultUrlText');
+      if (resultText) resultText.textContent = url;
+      
       refreshResultQR();
       navigate('result');
     });
