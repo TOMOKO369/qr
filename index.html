@@ -1,0 +1,2144 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="QR Magic - 魔法のようなQRコード作成・スキャンアプリ。鮮やかなグラデーションとグラスモーフィズムで彩られた近未来的UI。" />
+  <title>QR Magic - 魔法のQRコード体験</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
+
+  <!-- QR Code Library -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <!-- Fallback QR Code Generator -->
+  <script>
+    if (typeof QRCode === 'undefined') {
+      window.QRCode = {
+        CorrectLevel: { L: 'L', M: 'M', Q: 'Q', H: 'H' }
+      };
+      function createQRPlaceholder(container, text) {
+        container.innerHTML = '<div style="width:100%;height:100%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;color:#999;text-align:center;padding:10px;box-sizing:border-box;">QRコード生成</div>';
+      }
+      // Override QRCode constructor
+      window.QRCode = function(container, options) {
+        createQRPlaceholder(container, options.text);
+        this.makeCode = function() {};
+      };
+      window.QRCode.CorrectLevel = { L: 'L', M: 'M', Q: 'Q', H: 'H' };
+    }
+  </script>
+
+  <style>
+    /* =============================================
+       CSS DESIGN SYSTEM — QR Magic
+       Theme: Futuristic / Glassmorphism / Neon
+    ============================================= */
+    :root {
+      /* Color Palette */
+      --bg:                   #0d0d15;
+      --surface:              #13131b;
+      --surface-container:    #1f1f27;
+      --surface-high:         #292932;
+      --surface-highest:      #34343d;
+      --surface-variant:      #34343d;
+
+      --primary:              #00f0ff;
+      --primary-dim:          #00dbe9;
+      --primary-dark:         #006970;
+      --primary-glow:         rgba(0, 240, 255, 0.35);
+
+      --secondary:            #ff4b89;
+      --secondary-glow:       rgba(255, 75, 137, 0.35);
+      --secondary-container:  #ff4b89;
+
+      --tertiary:             #fed639;
+      --tertiary-glow:        rgba(254, 214, 57, 0.3);
+
+      --on-surface:           #e4e1ed;
+      --on-surface-variant:   #b9cacb;
+      --outline:              #849495;
+      --outline-variant:      #3b494b;
+
+      --error:                #ff5449;
+
+      /* Glassmorphism */
+      --glass-bg:             rgba(255, 255, 255, 0.05);
+      --glass-border:         rgba(255, 255, 255, 0.12);
+      --glass-blur:           16px;
+
+      /* Typography */
+      --font-display:         'Montserrat', sans-serif;
+      --font-body:            'Quicksand', sans-serif;
+
+      /* Spacing */
+      --px:                   24px;
+      --nav-height:           80px;
+      --header-height:        64px;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--on-surface);
+      font-family: var(--font-body);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ---- Scrollable page containers ---- */
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.35s ease, transform 0.35s ease;
+      transform: translateY(8px);
+    }
+    .screen.active {
+      opacity: 1;
+      pointer-events: all;
+      transform: translateY(0);
+    }
+
+    .screen-body {
+      flex: 1;
+      overflow-y: auto;
+      padding-bottom: var(--nav-height);
+      scroll-behavior: smooth;
+    }
+    .screen-body::-webkit-scrollbar { display: none; }
+
+    /* ---- Background ambient glow ---- */
+    .ambient-bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .ambient-bg::before {
+      content: '';
+      position: absolute;
+      top: -20%;
+      left: -20%;
+      width: 60%;
+      height: 60%;
+      background: radial-gradient(circle, rgba(0,240,255,0.12) 0%, transparent 70%);
+      animation: drift1 8s ease-in-out infinite alternate;
+    }
+    .ambient-bg::after {
+      content: '';
+      position: absolute;
+      bottom: -20%;
+      right: -20%;
+      width: 60%;
+      height: 60%;
+      background: radial-gradient(circle, rgba(255,75,137,0.1) 0%, transparent 70%);
+      animation: drift2 10s ease-in-out infinite alternate;
+    }
+    @keyframes drift1 {
+      from { transform: translate(0,0) scale(1); }
+      to   { transform: translate(40px, 30px) scale(1.1); }
+    }
+    @keyframes drift2 {
+      from { transform: translate(0,0) scale(1); }
+      to   { transform: translate(-30px, -40px) scale(1.15); }
+    }
+
+    /* ---- Top App Bar ---- */
+    .app-bar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      height: var(--header-height);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 var(--px);
+      background: rgba(19, 19, 27, 0.75);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--glass-border);
+    }
+    .app-bar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .app-bar-logo {
+      font-size: 28px;
+      color: var(--primary);
+      filter: drop-shadow(0 0 8px var(--primary-glow));
+      font-variation-settings: 'FILL' 1;
+    }
+    .app-bar-title {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, var(--primary) 0%, #7df4ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .icon-btn {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      color: var(--on-surface-variant);
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+      font-size: 22px;
+    }
+    .icon-btn:hover { background: var(--glass-bg); }
+    .icon-btn:active { transform: scale(0.88); }
+
+    /* ---- Bottom Navigation ---- */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 50;
+      height: var(--nav-height);
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding: 0 16px 12px;
+      background: rgba(31, 31, 39, 0.7);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-top: 1px solid var(--glass-border);
+      box-shadow: 0 -4px 32px rgba(0, 219, 233, 0.12);
+    }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 8px 20px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      border: none;
+      background: transparent;
+      color: var(--on-surface-variant);
+      text-decoration: none;
+      font-family: var(--font-body);
+    }
+    .nav-item .material-symbols-outlined { font-size: 24px; }
+    .nav-item span.label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+    .nav-item.active {
+      background: var(--secondary-container);
+      color: #fff;
+      box-shadow: 0 0 18px var(--secondary-glow);
+    }
+    .nav-item.active .material-symbols-outlined { font-variation-settings: 'FILL' 1; }
+    .nav-item:not(.active):hover { background: var(--glass-bg); color: var(--on-surface); }
+    .nav-item:active { transform: scale(0.9); }
+
+    /* ---- Glass Card ---- */
+    .glass-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+      border-radius: 20px;
+    }
+
+    /* ---- Neon Button ---- */
+    .btn-neon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px 28px;
+      border-radius: 999px;
+      border: none;
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-neon::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0);
+      transition: background 0.2s;
+    }
+    .btn-neon:hover::after { background: rgba(255,255,255,0.08); }
+    .btn-neon:active { transform: scale(0.96); }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary) 0%, #00a8b5 100%);
+      color: #002022;
+      box-shadow: 0 4px 24px var(--primary-glow);
+    }
+    .btn-secondary {
+      background: linear-gradient(135deg, var(--secondary) 0%, #c2185b 100%);
+      color: #fff;
+      box-shadow: 0 4px 24px var(--secondary-glow);
+    }
+    .btn-tertiary {
+      background: linear-gradient(135deg, var(--tertiary) 0%, #f5b800 100%);
+      color: #2c2000;
+      box-shadow: 0 4px 24px var(--tertiary-glow);
+    }
+    .btn-ghost {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      color: var(--on-surface);
+    }
+
+    /* ====================================================
+       SCREEN 1: HOME / CREATE
+    ==================================================== */
+    #screen-home .screen-body {
+      padding-top: 0;
+    }
+
+    .hero-section {
+      position: relative;
+      overflow: hidden;
+      padding: 36px var(--px) 32px;
+      text-align: center;
+    }
+    .hero-section::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, var(--primary-glow) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-eyebrow {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 10px;
+    }
+    .hero-title {
+      font-family: var(--font-display);
+      font-size: clamp(32px, 8vw, 48px);
+      font-weight: 900;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #ffffff 0%, var(--primary) 60%, var(--secondary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+    }
+    .hero-sub {
+      font-size: 14px;
+      color: var(--on-surface-variant);
+      max-width: 280px;
+      margin: 0 auto 28px;
+      line-height: 1.6;
+    }
+
+    /* QR Preview in hero */
+    .qr-preview-wrapper {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 160px;
+      height: 160px;
+      margin: 0 auto 28px;
+    }
+    .qr-preview-wrapper::before {
+      content: '';
+      position: absolute;
+      inset: -12px;
+      border-radius: 28px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary), var(--tertiary));
+      opacity: 0.2;
+      animation: pulse-ring 3s ease-in-out infinite;
+    }
+    @keyframes pulse-ring {
+      0%, 100% { transform: scale(1); opacity: 0.2; }
+      50%       { transform: scale(1.06); opacity: 0.35; }
+    }
+    .qr-preview-inner {
+      width: 160px;
+      height: 160px;
+      border-radius: 20px;
+      overflow: hidden;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 40px var(--primary-glow), 0 8px 32px rgba(0,0,0,0.4);
+      position: relative;
+      z-index: 1;
+    }
+    .qr-preview-inner canvas,
+    .qr-preview-inner img { width: 140px !important; height: 140px !important; }
+    .qr-placeholder-icon {
+      font-size: 80px;
+      color: #ccc;
+      font-variation-settings: 'FILL' 0;
+    }
+
+    /* Input Section */
+    .input-section {
+      padding: 0 var(--px) 24px;
+    }
+    .input-group {
+      position: relative;
+      margin-bottom: 14px;
+    }
+    .input-label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 8px;
+      display: block;
+    }
+    .neon-input {
+      width: 100%;
+      padding: 14px 48px 14px 18px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--outline-variant);
+      border-radius: 14px;
+      color: var(--on-surface);
+      font-family: var(--font-body);
+      font-size: 15px;
+      font-weight: 500;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    }
+    .neon-input::placeholder { color: var(--outline); }
+    .neon-input:focus {
+      border-color: var(--primary);
+      background: rgba(0,240,255,0.05);
+      box-shadow: 0 0 0 3px rgba(0,240,255,0.15);
+    }
+    .input-icon {
+      position: absolute;
+      right: 14px;
+      bottom: 14px;
+      font-size: 20px;
+      color: var(--outline);
+      pointer-events: none;
+    }
+
+    .generate-btn {
+      width: 100%;
+      margin-top: 4px;
+      padding: 16px;
+      font-size: 16px;
+    }
+
+    /* Quick presets */
+    .quick-presets {
+      padding: 0 var(--px) 24px;
+    }
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--on-surface-variant);
+      margin-bottom: 14px;
+    }
+    .preset-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .preset-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 14px 8px;
+      border-radius: 16px;
+      cursor: pointer;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg);
+      transition: all 0.2s;
+      color: var(--on-surface);
+      text-align: center;
+      font-family: var(--font-body);
+    }
+    .preset-card:hover { background: rgba(255,255,255,0.08); border-color: var(--primary); }
+    .preset-card:active { transform: scale(0.94); }
+    .preset-card .material-symbols-outlined { font-size: 26px; }
+    .preset-card span.pname { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
+    .preset-icon-url  { color: var(--primary); }
+    .preset-icon-wifi { color: var(--secondary); }
+    .preset-icon-vcard{ color: var(--tertiary); }
+    .preset-icon-text { color: #a78bfa; }
+    .preset-icon-email{ color: #34d399; }
+    .preset-icon-phone{ color: #fb923c; }
+
+    /* ====================================================
+       SCREEN 2: SCAN
+    ==================================================== */
+    #screen-scan {
+      /* no extra header */
+    }
+    .scan-fullscreen {
+      flex: 1;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      padding-bottom: var(--nav-height);
+    }
+    .scan-bg-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.5;
+      filter: saturate(1.2);
+    }
+    .scan-vignette {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 30%, rgba(13,13,21,0.85) 100%);
+    }
+    .scan-content {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      padding: 0 var(--px);
+      width: 100%;
+    }
+    .scan-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 22px;
+      border-radius: 999px;
+      background: rgba(19,19,27,0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+    }
+    .scan-pill .material-symbols-outlined {
+      font-size: 20px;
+      color: var(--primary);
+      font-variation-settings: 'FILL' 1;
+    }
+    .scan-pill-text {
+      font-family: var(--font-display);
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--on-surface);
+    }
+
+    /* Viewfinder */
+    .viewfinder {
+      position: relative;
+      width: 260px;
+      height: 260px;
+    }
+    .vf-corner {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      border-color: var(--primary);
+      border-style: solid;
+      border-width: 0;
+    }
+    .vf-corner.tl { top:0; left:0;  border-top-width:4px; border-left-width:4px;  border-radius: 12px 0 0 0; }
+    .vf-corner.tr { top:0; right:0; border-top-width:4px; border-right-width:4px; border-radius: 0 12px 0 0; }
+    .vf-corner.bl { bottom:0; left:0;  border-bottom-width:4px; border-left-width:4px;  border-radius: 0 0 0 12px; }
+    .vf-corner.br { bottom:0; right:0; border-bottom-width:4px; border-right-width:4px; border-radius: 0 0 12px 0; }
+    .vf-corner { filter: drop-shadow(0 0 8px var(--primary)); }
+
+    .vf-inner {
+      position: absolute;
+      inset: 0;
+      border-radius: 16px;
+      background: rgba(0,240,255,0.03);
+      overflow: hidden;
+    }
+    .scan-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--primary), transparent);
+      box-shadow: 0 0 12px var(--primary), 0 0 4px #fff;
+      animation: scanline 2.5s ease-in-out infinite;
+    }
+    @keyframes scanline {
+      0%   { top: 0%;   opacity: 0; }
+      8%   { opacity: 1; }
+      92%  { opacity: 1; }
+      100% { top: 100%; opacity: 0; }
+    }
+
+    .vf-crosshair {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0.15;
+    }
+    .vf-crosshair::before {
+      content: '';
+      position: absolute;
+      width: 32px;
+      height: 2px;
+      background: var(--primary);
+    }
+    .vf-crosshair::after {
+      content: '';
+      position: absolute;
+      width: 2px;
+      height: 32px;
+      background: var(--primary);
+    }
+
+    .scan-hint {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--on-surface-variant);
+    }
+
+    .scan-controls {
+      display: flex;
+      gap: 28px;
+    }
+    .scan-ctrl-btn {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 1px solid var(--glass-border);
+      background: rgba(19,19,27,0.65);
+      backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--on-surface);
+      font-size: 24px;
+      transition: all 0.2s;
+    }
+    .scan-ctrl-btn:hover { background: rgba(255,255,255,0.1); }
+    .scan-ctrl-btn:active { transform: scale(0.88); }
+    .scan-ctrl-btn.active { color: var(--primary); box-shadow: 0 0 16px var(--primary-glow); }
+
+    /* Scan Result Toast */
+    .scan-result-toast {
+      position: absolute;
+      bottom: calc(var(--nav-height) + 16px);
+      left: var(--px);
+      right: var(--px);
+      z-index: 20;
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: rgba(31,31,39,0.9);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--primary);
+      box-shadow: 0 0 24px var(--primary-glow);
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      animation: slideUp 0.3s ease;
+    }
+    .scan-result-toast.show { display: flex; }
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to   { transform: translateY(0); opacity: 1; }
+    }
+    .scan-result-url {
+      font-size: 14px;
+      color: var(--primary);
+      font-weight: 600;
+      word-break: break-all;
+    }
+    .scan-result-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .scan-result-actions .btn-neon {
+      flex: 1;
+      padding: 10px;
+      font-size: 13px;
+    }
+
+    /* ====================================================
+       SCREEN 3: RESULT / CUSTOMIZE
+    ==================================================== */
+    .result-qr-section {
+      padding: 24px var(--px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+    .result-qr-frame {
+      position: relative;
+      width: 200px;
+      height: 200px;
+    }
+    .result-qr-frame::before {
+      content: '';
+      position: absolute;
+      inset: -16px;
+      border-radius: 32px;
+      background: conic-gradient(from 0deg, var(--primary), var(--secondary), var(--tertiary), var(--primary));
+      opacity: 0.6;
+      animation: spin-ring 4s linear infinite;
+      filter: blur(4px);
+    }
+    @keyframes spin-ring {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+    .result-qr-box {
+      width: 200px;
+      height: 200px;
+      border-radius: 20px;
+      background: #fff;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+    }
+    .result-qr-box canvas,
+    .result-qr-box img { width: 180px !important; height: 180px !important; }
+
+    .result-url-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 18px;
+      border-radius: 999px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      max-width: 100%;
+    }
+    .result-url-badge .material-symbols-outlined { font-size: 16px; color: var(--primary); }
+    .result-url-text {
+      font-size: 13px;
+      color: var(--on-surface-variant);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 240px;
+    }
+
+    /* Customization panel */
+    .custom-panel {
+      padding: 0 var(--px) 24px;
+    }
+    .custom-section {
+      margin-bottom: 22px;
+    }
+    .custom-section-title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--on-surface-variant);
+      margin-bottom: 12px;
+    }
+
+    /* Color Swatches */
+    .color-swatches {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .color-swatch {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 3px solid transparent;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .color-swatch.selected {
+      border-color: #fff;
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.4);
+    }
+    .color-swatch:active { transform: scale(0.88); }
+
+    /* Dot Style */
+    .dot-styles {
+      display: flex;
+      gap: 10px;
+    }
+    .dot-style-btn {
+      flex: 1;
+      padding: 10px 8px;
+      border-radius: 14px;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      color: var(--on-surface-variant);
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      transition: all 0.2s;
+    }
+    .dot-style-btn.selected {
+      border-color: var(--primary);
+      background: rgba(0,240,255,0.08);
+      color: var(--primary);
+      box-shadow: 0 0 12px rgba(0,240,255,0.2);
+    }
+    .dot-style-btn:active { transform: scale(0.94); }
+    .dot-demo {
+      display: grid;
+      grid-template-columns: repeat(3,1fr);
+      gap: 2px;
+      width: 28px;
+      height: 28px;
+    }
+    .dot-demo-cell { background: currentColor; }
+    .dot-demo-cell.round { border-radius: 50%; }
+    .dot-demo-cell.rounded { border-radius: 3px; }
+
+    /* Toggle */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-radius: 14px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      margin-bottom: 10px;
+    }
+    .toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .toggle-label .material-symbols-outlined { font-size: 20px; color: var(--on-surface-variant); }
+    .toggle-label span.ttext { font-size: 14px; font-weight: 600; }
+    .toggle {
+      width: 44px;
+      height: 26px;
+      background: var(--surface-highest);
+      border-radius: 999px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.25s;
+      border: none;
+    }
+    .toggle.on { background: var(--primary); }
+    .toggle::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.25s;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .toggle.on::after { transform: translateX(18px); }
+
+    /* Action buttons row */
+    .result-actions {
+      display: flex;
+      gap: 10px;
+      padding: 0 var(--px) 8px;
+    }
+    .result-actions .btn-neon { flex: 1; padding: 13px 10px; font-size: 13px; }
+
+    /* Error correction */
+    .ec-group {
+      display: flex;
+      gap: 8px;
+    }
+    .ec-btn {
+      flex: 1;
+      padding: 8px 4px;
+      border-radius: 10px;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg);
+      color: var(--on-surface-variant);
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .ec-btn.selected {
+      border-color: var(--secondary);
+      background: rgba(255,75,137,0.12);
+      color: var(--secondary);
+    }
+
+    /* ====================================================
+       SCREEN 4: HISTORY
+    ==================================================== */
+    .history-header {
+      padding: 20px var(--px) 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .history-title {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+    .history-filter {
+      display: flex;
+      gap: 8px;
+      padding: 0 var(--px);
+      margin-bottom: 18px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .history-filter::-webkit-scrollbar { display: none; }
+    .filter-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg);
+      cursor: pointer;
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--on-surface-variant);
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .filter-chip.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #002022;
+      box-shadow: 0 2px 12px var(--primary-glow);
+    }
+    .filter-chip .material-symbols-outlined { font-size: 14px; }
+
+    .history-list {
+      padding: 0 var(--px);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .history-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .history-item:hover { background: rgba(255,255,255,0.07); border-color: var(--outline); }
+    .history-item:active { transform: scale(0.98); }
+
+    .history-qr-thumb {
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+      background: #fff;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    }
+    .history-qr-thumb canvas,
+    .history-qr-thumb img { width: 44px !important; height: 44px !important; }
+
+    .history-item-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .history-item-url {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--on-surface);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 3px;
+    }
+    .history-item-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--on-surface-variant);
+    }
+    .history-item-meta .material-symbols-outlined { font-size: 12px; }
+
+    .history-type-badge {
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .badge-create {
+      background: rgba(0,240,255,0.15);
+      color: var(--primary);
+    }
+    .badge-scan {
+      background: rgba(255,75,137,0.15);
+      color: var(--secondary);
+    }
+
+    .history-item-action {
+      flex-shrink: 0;
+      color: var(--on-surface-variant);
+      font-size: 20px;
+    }
+
+    /* Empty state */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      padding: 60px var(--px);
+      text-align: center;
+      color: var(--on-surface-variant);
+    }
+    .empty-state .material-symbols-outlined { font-size: 64px; opacity: 0.3; }
+    .empty-state p { font-size: 14px; line-height: 1.6; opacity: 0.6; }
+
+    /* ====================================================
+       SETTINGS MODAL
+    ==================================================== */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: flex-end;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .modal-overlay.show { opacity: 1; pointer-events: all; }
+    .modal-sheet {
+      width: 100%;
+      background: var(--surface-container);
+      border-radius: 28px 28px 0 0;
+      padding: 20px var(--px) 40px;
+      border: 1px solid var(--glass-border);
+      border-bottom: none;
+      transform: translateY(100%);
+      transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .modal-overlay.show .modal-sheet { transform: translateY(0); }
+    .modal-handle {
+      width: 40px;
+      height: 4px;
+      background: var(--outline-variant);
+      border-radius: 999px;
+      margin: 0 auto 20px;
+    }
+    .modal-title {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 20px;
+    }
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--outline-variant);
+    }
+    .setting-label {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .setting-label .material-symbols-outlined { font-size: 22px; color: var(--on-surface-variant); }
+    .setting-label span.st { font-size: 14px; font-weight: 600; }
+    .setting-value { font-size: 13px; color: var(--on-surface-variant); }
+
+    /* ====================================================
+       UTILITIES
+    ==================================================== */
+    .neon-text-primary {
+      color: var(--primary);
+      text-shadow: 0 0 12px var(--primary-glow);
+    }
+    .gradient-divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--outline-variant), transparent);
+      margin: 0 var(--px) 20px;
+    }
+    .spacer-sm { height: 12px; }
+    .spacer-md { height: 20px; }
+
+    /* Ripple animation on buttons */
+    @keyframes ripple {
+      to { transform: scale(4); opacity: 0; }
+    }
+
+    /* Success checkmark animation */
+    @keyframes pop-in {
+      0%   { transform: scale(0) rotate(-20deg); opacity: 0; }
+      70%  { transform: scale(1.15) rotate(5deg); }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+    .pop-in { animation: pop-in 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+
+    /* Floating particles */
+    .particle {
+      position: fixed;
+      pointer-events: none;
+      border-radius: 50%;
+      opacity: 0;
+      animation: float-particle 6s ease-in-out infinite;
+    }
+    @keyframes float-particle {
+      0%   { transform: translateY(100vh) scale(0); opacity: 0; }
+      10%  { opacity: 0.6; }
+      90%  { opacity: 0.3; }
+      100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Ambient background glow -->
+<div class="ambient-bg"></div>
+
+<!-- Floating particles -->
+<canvas id="particleCanvas" style="position:fixed;inset:0;pointer-events:none;z-index:1;opacity:0.4;"></canvas>
+
+<!-- ================================================
+     APP BAR (shared, hidden on scan screen)
+================================================ -->
+<header class="app-bar" id="appBar" style="position:fixed;top:0;left:0;right:0;z-index:50;">
+  <div class="app-bar-brand">
+    <span class="material-symbols-outlined app-bar-logo">qr_code_2</span>
+    <span class="app-bar-title">QR Magic</span>
+  </div>
+  <button class="icon-btn material-symbols-outlined" id="settingsBtn" title="設定">settings</button>
+</header>
+
+<!-- ================================================
+     SCREEN 1: HOME / CREATE
+================================================ -->
+<div class="screen active" id="screen-home" style="top:var(--header-height);">
+  <div class="screen-body">
+    <!-- Hero -->
+    <section class="hero-section">
+      <p class="hero-eyebrow">✨ 魔法のQRコード</p>
+      <h1 class="hero-title">Create Magic</h1>
+      <p class="hero-sub">URLやテキストを入力して、あなただけの特別なQRコードを作成しましょう。</p>
+
+      <!-- Live QR preview -->
+      <div class="qr-preview-wrapper">
+        <div class="qr-preview-inner" id="homeQrPreview">
+          <span class="material-symbols-outlined qr-placeholder-icon" id="homeQrIcon">qr_code_2</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Input -->
+    <section class="input-section">
+      <label class="input-label" for="urlInput">URLまたはテキスト</label>
+      <div class="input-group">
+        <input
+          class="neon-input"
+          id="urlInput"
+          type="text"
+          placeholder="https://example.com"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <span class="material-symbols-outlined input-icon">link</span>
+      </div>
+
+      <button class="btn-neon btn-primary generate-btn" id="generateBtn">
+        <span class="material-symbols-outlined" style="font-size:20px;">auto_awesome</span>
+        QRコードを生成
+      </button>
+    </section>
+
+    <div class="gradient-divider"></div>
+
+    <!-- Quick presets -->
+    <section class="quick-presets">
+      <p class="section-title">クイック選択</p>
+      <div class="preset-grid">
+        <button class="preset-card" data-preset="url">
+          <span class="material-symbols-outlined preset-icon-url">link</span>
+          <span class="pname">URL</span>
+        </button>
+        <button class="preset-card" data-preset="wifi">
+          <span class="material-symbols-outlined preset-icon-wifi">wifi</span>
+          <span class="pname">Wi-Fi</span>
+        </button>
+        <button class="preset-card" data-preset="vcard">
+          <span class="material-symbols-outlined preset-icon-vcard">contact_page</span>
+          <span class="pname">名刺</span>
+        </button>
+        <button class="preset-card" data-preset="text">
+          <span class="material-symbols-outlined preset-icon-text">subject</span>
+          <span class="pname">テキスト</span>
+        </button>
+        <button class="preset-card" data-preset="email">
+          <span class="material-symbols-outlined preset-icon-email">mail</span>
+          <span class="pname">メール</span>
+        </button>
+        <button class="preset-card" data-preset="phone">
+          <span class="material-symbols-outlined preset-icon-phone">call</span>
+          <span class="pname">電話</span>
+        </button>
+      </div>
+    </section>
+
+    <div class="spacer-md"></div>
+  </div>
+</div>
+
+<!-- ================================================
+     SCREEN 2: SCAN
+================================================ -->
+<div class="screen" id="screen-scan" style="top:0;bottom:0;">
+  <!-- No separate app bar in fullscreen scan -->
+  <div class="scan-fullscreen">
+    <!-- bg placeholder image using canvas-drawn gradient (no external image needed) -->
+    <canvas id="scanBg" class="scan-bg-img"></canvas>
+    <div class="scan-vignette"></div>
+
+    <!-- Top bar overlay for scan -->
+    <div style="position:absolute;top:0;left:0;right:0;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;z-index:20;background:rgba(13,13,21,0.6);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,0.08);">
+      <div class="app-bar-brand">
+        <span class="material-symbols-outlined app-bar-logo">qr_code_2</span>
+        <span class="app-bar-title">QR Magic</span>
+      </div>
+      <button class="icon-btn material-symbols-outlined" id="settingsBtnScan">settings</button>
+    </div>
+
+    <div class="scan-content">
+      <div class="scan-pill">
+        <span class="material-symbols-outlined">center_focus_weak</span>
+        <span class="scan-pill-text">QRコードをスキャン</span>
+      </div>
+
+      <div class="viewfinder">
+        <div class="vf-corner tl"></div>
+        <div class="vf-corner tr"></div>
+        <div class="vf-corner bl"></div>
+        <div class="vf-corner br"></div>
+        <div class="vf-inner">
+          <div class="scan-line"></div>
+        </div>
+        <div class="vf-crosshair"></div>
+      </div>
+
+      <p class="scan-hint">枠内に収めてください</p>
+
+      <div class="scan-controls">
+        <button class="scan-ctrl-btn" id="flashBtn" title="フラッシュライト">
+          <span class="material-symbols-outlined">flashlight_on</span>
+        </button>
+        <button class="scan-ctrl-btn" id="galleryBtn" title="画像から読み取り">
+          <span class="material-symbols-outlined">image</span>
+        </button>
+        <button class="scan-ctrl-btn" id="demoScanBtn" title="デモスキャン">
+          <span class="material-symbols-outlined">qr_code_scanner</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Scan result toast -->
+    <div class="scan-result-toast" id="scanResultToast">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="material-symbols-outlined" style="color:var(--primary);font-variation-settings:'FILL' 1;font-size:20px;">check_circle</span>
+        <span style="font-size:12px;font-weight:700;color:var(--primary);letter-spacing:0.08em;text-transform:uppercase;">スキャン成功</span>
+      </div>
+      <p class="scan-result-url" id="scanResultUrl"></p>
+      <div class="scan-result-actions">
+        <button class="btn-neon btn-primary" id="scanOpenBtn">
+          <span class="material-symbols-outlined" style="font-size:14px;">open_in_new</span>
+          開く
+        </button>
+        <button class="btn-neon btn-ghost" id="scanCopyBtn">
+          <span class="material-symbols-outlined" style="font-size:14px;">content_copy</span>
+          コピー
+        </button>
+        <button class="btn-neon btn-ghost" id="scanCloseToastBtn">✕</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================
+     SCREEN 3: RESULT / CUSTOMIZE
+================================================ -->
+<div class="screen" id="screen-result" style="top:var(--header-height);">
+  <div class="screen-body">
+    <!-- QR display -->
+    <div class="result-qr-section">
+      <div class="result-qr-frame">
+        <div class="result-qr-box" id="resultQrBox"></div>
+      </div>
+
+      <div class="result-url-badge">
+        <span class="material-symbols-outlined">link</span>
+        <span class="result-url-text" id="resultUrlText">https://example.com</span>
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="result-actions">
+      <button class="btn-neon btn-primary" id="downloadBtn">
+        <span class="material-symbols-outlined" style="font-size:16px;">download</span>
+        保存
+      </button>
+      <button class="btn-neon btn-secondary" id="shareBtn">
+        <span class="material-symbols-outlined" style="font-size:16px;">share</span>
+        共有
+      </button>
+      <button class="btn-neon btn-ghost" id="copyQrBtn">
+        <span class="material-symbols-outlined" style="font-size:16px;">content_copy</span>
+        コピー
+      </button>
+    </div>
+
+    <div class="gradient-divider"></div>
+
+    <!-- Customization -->
+    <div class="custom-panel">
+      <p class="section-title" style="padding:0 0 12px;">🎨 カスタマイズ</p>
+
+      <!-- Color -->
+      <div class="custom-section">
+        <p class="custom-section-title">カラー</p>
+        <div class="color-swatches" id="colorSwatches">
+          <div class="color-swatch selected" data-color="#000000" style="background:#000000;"></div>
+          <div class="color-swatch" data-color="#006970" style="background:#006970;"></div>
+          <div class="color-swatch" data-color="#c2185b" style="background:#c2185b;"></div>
+          <div class="color-swatch" data-color="#4a148c" style="background:#4a148c;"></div>
+          <div class="color-swatch" data-color="#e65100" style="background:#e65100;"></div>
+          <div class="color-swatch" data-color="#1b5e20" style="background:#1b5e20;"></div>
+        </div>
+      </div>
+
+      <!-- Dot style -->
+      <div class="custom-section">
+        <p class="custom-section-title">ドットスタイル</p>
+        <div class="dot-styles" id="dotStyles">
+          <button class="dot-style-btn selected" data-style="square">
+            <div class="dot-demo">
+              <div class="dot-demo-cell"></div><div class="dot-demo-cell"></div><div class="dot-demo-cell"></div>
+              <div class="dot-demo-cell"></div><div class="dot-demo-cell"></div><div class="dot-demo-cell"></div>
+              <div class="dot-demo-cell"></div><div class="dot-demo-cell"></div><div class="dot-demo-cell"></div>
+            </div>
+            スクエア
+          </button>
+          <button class="dot-style-btn" data-style="rounded">
+            <div class="dot-demo">
+              <div class="dot-demo-cell rounded"></div><div class="dot-demo-cell rounded"></div><div class="dot-demo-cell rounded"></div>
+              <div class="dot-demo-cell rounded"></div><div class="dot-demo-cell rounded"></div><div class="dot-demo-cell rounded"></div>
+              <div class="dot-demo-cell rounded"></div><div class="dot-demo-cell rounded"></div><div class="dot-demo-cell rounded"></div>
+            </div>
+            ラウンド
+          </button>
+          <button class="dot-style-btn" data-style="dots">
+            <div class="dot-demo">
+              <div class="dot-demo-cell round"></div><div class="dot-demo-cell round"></div><div class="dot-demo-cell round"></div>
+              <div class="dot-demo-cell round"></div><div class="dot-demo-cell round"></div><div class="dot-demo-cell round"></div>
+              <div class="dot-demo-cell round"></div><div class="dot-demo-cell round"></div><div class="dot-demo-cell round"></div>
+            </div>
+            ドット
+          </button>
+        </div>
+      </div>
+
+      <!-- Error correction -->
+      <div class="custom-section">
+        <p class="custom-section-title">エラー訂正レベル</p>
+        <div class="ec-group" id="ecGroup">
+          <button class="ec-btn" data-ec="L">L</button>
+          <button class="ec-btn selected" data-ec="M">M</button>
+          <button class="ec-btn" data-ec="Q">Q</button>
+          <button class="ec-btn" data-ec="H">H</button>
+        </div>
+      </div>
+
+      <!-- Toggles -->
+      <div class="custom-section">
+        <div class="toggle-row">
+          <div class="toggle-label">
+            <span class="material-symbols-outlined">photo_camera</span>
+            <span class="ttext">ロゴを追加</span>
+          </div>
+          <button class="toggle" id="toggleLogo" aria-label="ロゴを追加"></button>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-label">
+            <span class="material-symbols-outlined">border_all</span>
+            <span class="ttext">枠線を表示</span>
+          </div>
+          <button class="toggle on" id="toggleBorder" aria-label="枠線を表示"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================
+     SCREEN 4: HISTORY
+================================================ -->
+<div class="screen" id="screen-history" style="top:var(--header-height);">
+  <div class="screen-body">
+    <div class="history-header">
+      <h2 class="history-title">履歴</h2>
+      <button class="icon-btn material-symbols-outlined" id="clearHistoryBtn" title="履歴をクリア">delete_sweep</button>
+    </div>
+
+    <!-- Filter chips -->
+    <div class="history-filter">
+      <button class="filter-chip active" data-filter="all">
+        <span class="material-symbols-outlined">grid_view</span>
+        すべて
+      </button>
+      <button class="filter-chip" data-filter="create">
+        <span class="material-symbols-outlined">add_circle</span>
+        作成
+      </button>
+      <button class="filter-chip" data-filter="scan">
+        <span class="material-symbols-outlined">qr_code_scanner</span>
+        スキャン
+      </button>
+    </div>
+
+    <!-- History list -->
+    <div class="history-list" id="historyList">
+      <!-- Items injected by JS -->
+    </div>
+
+    <div class="spacer-md"></div>
+  </div>
+</div>
+
+<!-- ================================================
+     BOTTOM NAVIGATION
+================================================ -->
+<nav class="bottom-nav" id="bottomNav">
+  <button class="nav-item active" data-screen="home" id="nav-home">
+    <span class="material-symbols-outlined">add_circle</span>
+    <span class="label">作成</span>
+  </button>
+  <button class="nav-item" data-screen="scan" id="nav-scan">
+    <span class="material-symbols-outlined">qr_code_scanner</span>
+    <span class="label">スキャン</span>
+  </button>
+  <button class="nav-item" data-screen="history" id="nav-history">
+    <span class="material-symbols-outlined">history</span>
+    <span class="label">履歴</span>
+  </button>
+</nav>
+
+<!-- ================================================
+     SETTINGS MODAL
+================================================ -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <h2 class="modal-title">⚙️ 設定</h2>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        <span class="material-symbols-outlined">dark_mode</span>
+        <span class="st">テーマ</span>
+      </div>
+      <span class="setting-value">ダーク</span>
+    </div>
+    <div class="setting-row">
+      <div class="setting-label">
+        <span class="material-symbols-outlined">language</span>
+        <span class="st">言語</span>
+      </div>
+      <span class="setting-value">日本語</span>
+    </div>
+    <div class="setting-row">
+      <div class="setting-label">
+        <span class="material-symbols-outlined">vibration</span>
+        <span class="st">バイブレーション</span>
+      </div>
+      <button class="toggle on" id="toggleVibrate"></button>
+    </div>
+    <div class="setting-row">
+      <div class="setting-label">
+        <span class="material-symbols-outlined">save</span>
+        <span class="st">自動保存</span>
+      </div>
+      <button class="toggle on" id="toggleAutoSave"></button>
+    </div>
+
+    <div class="spacer-md"></div>
+    <button class="btn-neon btn-ghost" id="closeSettingsBtn" style="width:100%;">閉じる</button>
+  </div>
+</div>
+
+<!-- ================================================
+     JAVASCRIPT
+================================================ -->
+<script>
+/* =============================================
+   STATE
+============================================= */
+const state = {
+  currentScreen: 'home',
+  qrUrl: '',
+  qrColor: '#000000',
+  qrEC: 'M',
+  flashOn: false,
+  history: JSON.parse(localStorage.getItem('qr_history') || '[]'),
+  customOptions: {
+    color: '#000000',
+    ec: 'M',
+    dotStyle: 'square',
+    showBorder: true,
+    showLogo: false,
+  }
+};
+
+/* =============================================
+   NAVIGATION
+============================================= */
+const screens = {
+  home:    document.getElementById('screen-home'),
+  scan:    document.getElementById('screen-scan'),
+  result:  document.getElementById('screen-result'),
+  history: document.getElementById('screen-history'),
+};
+const navItems = document.querySelectorAll('.nav-item');
+const appBar   = document.getElementById('appBar');
+
+function navigate(screen) {
+  // Deactivate all
+  Object.values(screens).forEach(s => s.classList.remove('active'));
+  navItems.forEach(n => n.classList.remove('active'));
+
+  // Activate target
+  if (screens[screen]) screens[screen].classList.add('active');
+
+  // Update nav
+  const navEl = document.getElementById('nav-' + screen);
+  if (navEl) navEl.classList.add('active');
+
+  // App bar visibility
+  if (screen === 'scan') {
+    appBar.style.display = 'none';
+  } else {
+    appBar.style.display = 'flex';
+  }
+
+  // Screen-specific actions
+  if (screen === 'history') renderHistory();
+  if (screen === 'result' && !state.qrUrl) navigate('home');
+
+  state.currentScreen = screen;
+}
+
+navItems.forEach(btn => {
+  btn.addEventListener('click', () => navigate(btn.dataset.screen));
+});
+
+/* =============================================
+   PARTICLE CANVAS
+============================================= */
+(function initParticles() {
+  const canvas = document.getElementById('particleCanvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, particles = [];
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const COLORS = ['#00f0ff','#ff4b89','#fed639','#7df4ff'];
+
+  function createParticle() {
+    return {
+      x: Math.random() * W,
+      y: H + 10,
+      r: Math.random() * 2 + 0.5,
+      speed: Math.random() * 0.6 + 0.2,
+      opacity: Math.random() * 0.5 + 0.2,
+      color: COLORS[Math.floor(Math.random() * COLORS.length)],
+      drift: (Math.random() - 0.5) * 0.4,
+    };
+  }
+
+  for (let i = 0; i < 30; i++) {
+    const p = createParticle();
+    p.y = Math.random() * H;
+    particles.push(p);
+  }
+
+  function animate() {
+    ctx.clearRect(0, 0, W, H);
+    particles.forEach((p, i) => {
+      p.y -= p.speed;
+      p.x += p.drift;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = p.opacity;
+      ctx.fill();
+
+      if (p.y < -10) particles[i] = createParticle();
+    });
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+
+/* =============================================
+   SCAN BACKGROUND CANVAS
+============================================= */
+(function drawScanBg() {
+  const c = document.getElementById('scanBg');
+  if (!c) return;
+  c.width  = 400;
+  c.height = 800;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 400, 800);
+  g.addColorStop(0,   '#0a0a14');
+  g.addColorStop(0.3, '#071520');
+  g.addColorStop(0.6, '#130820');
+  g.addColorStop(1,   '#0d0d15');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 400, 800);
+
+  // Circuit lines
+  ctx.strokeStyle = 'rgba(0,240,255,0.08)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 20; i++) {
+    const x = Math.random() * 400;
+    const y = Math.random() * 800;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + (Math.random()-0.5)*200, y + (Math.random()-0.5)*200);
+    ctx.stroke();
+  }
+
+  // Dots
+  for (let i = 0; i < 60; i++) {
+    ctx.beginPath();
+    ctx.arc(Math.random()*400, Math.random()*800, Math.random()*1.5+0.3, 0, Math.PI*2);
+    const colors = ['rgba(0,240,255,0.4)','rgba(255,75,137,0.3)','rgba(254,214,57,0.3)'];
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fill();
+  }
+})();
+
+/* =============================================
+   QR CODE GENERATION
+============================================= */
+let homeQRInstance   = null;
+let resultQRInstance = null;
+
+function generateQR(container, text, opts = {}) {
+  if (!container) return;
+  container.innerHTML = '';
+  const size = opts.size || 140;
+  try {
+    if (typeof QRCode === 'undefined' || !QRCode.CorrectLevel) {
+      // Fallback: create a simple placeholder
+      container.innerHTML = `<div style="width:${size}px;height:${size}px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;color:#ccc;border:1px solid #eee;">QR</div>`;
+      return;
+    }
+    return new QRCode(container, {
+      text:            text || 'https://qr-magic.app',
+      width:           size,
+      height:          size,
+      colorDark:       opts.color || '#000000',
+      colorLight:      '#ffffff',
+      correctLevel:    QRCode.CorrectLevel[opts.ec || 'M'],
+    });
+  } catch(e) {
+    console.warn('QR gen error:', e);
+    // Fallback on error
+    container.innerHTML = `<div style="width:${size}px;height:${size}px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;color:#ccc;border:1px solid #eee;">QR</div>`;
+  }
+}
+
+function refreshResultQR() {
+  const box = document.getElementById('resultQrBox');
+  if (!box) return;
+  box.innerHTML = '';
+  generateQR(box, state.qrUrl, {
+    size: 180,
+    color: state.customOptions.color,
+    ec: state.customOptions.ec,
+  });
+
+  // Border styling
+  if (state.customOptions.showBorder) {
+    box.style.outline = '3px solid var(--primary)';
+    box.style.outlineOffset = '3px';
+  } else {
+    box.style.outline = 'none';
+  }
+}
+
+/* =============================================
+   HOME / CREATE SCREEN
+============================================= */
+const urlInput   = document.getElementById('urlInput');
+const generateBtn = document.getElementById('generateBtn');
+const homeQrPreview = document.getElementById('homeQrPreview');
+const homeQrIcon    = document.getElementById('homeQrIcon');
+
+let debounceTimer;
+urlInput.addEventListener('input', () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    const val = urlInput.value.trim();
+    if (val.length > 2) {
+      if (homeQrIcon) homeQrIcon.remove();
+      generateQR(homeQrPreview, val, { size: 140 });
+    } else {
+      homeQrPreview.innerHTML = '<span class="material-symbols-outlined qr-placeholder-icon" id="homeQrIcon">qr_code_2</span>';
+    }
+  }, 400);
+});
+
+generateBtn.addEventListener('click', () => {
+  const val = urlInput.value.trim();
+  if (!val) {
+    urlInput.focus();
+    urlInput.style.borderColor = 'var(--error)';
+    setTimeout(() => urlInput.style.borderColor = '', 1500);
+    return;
+  }
+
+  state.qrUrl = val;
+  document.getElementById('resultUrlText').textContent = val;
+  refreshResultQR();
+
+  // Add to history
+  addToHistory({ type: 'create', url: val, date: new Date().toISOString() });
+
+  // Navigate to result
+  navigate('result');
+
+  // Show result in bottom nav (temporary override)
+  document.getElementById('nav-history').classList.remove('active');
+  // Activate result nav (result doesn't have a nav item, highlight history)
+});
+
+// Preset buttons
+document.querySelectorAll('.preset-card').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const presetMap = {
+      url:   'https://',
+      wifi:  'WIFI:T:WPA;S:MyNetwork;P:mypassword;;',
+      vcard: 'BEGIN:VCARD\nVERSION:3.0\nFN:山田 太郎\nTEL:090-0000-0000\nEMAIL:taro@example.com\nEND:VCARD',
+      text:  'こんにちは！',
+      email: 'mailto:hello@example.com',
+      phone: 'tel:+81-90-0000-0000',
+    };
+    urlInput.value = presetMap[btn.dataset.preset] || '';
+    urlInput.focus();
+    // Trigger preview
+    urlInput.dispatchEvent(new Event('input'));
+  });
+});
+
+/* =============================================
+   SCAN SCREEN
+============================================= */
+const flashBtn    = document.getElementById('flashBtn');
+const demoScanBtn = document.getElementById('demoScanBtn');
+const scanResultToast = document.getElementById('scanResultToast');
+const scanResultUrl   = document.getElementById('scanResultUrl');
+
+flashBtn.addEventListener('click', () => {
+  state.flashOn = !state.flashOn;
+  const icon = flashBtn.querySelector('.material-symbols-outlined');
+  if (state.flashOn) {
+    icon.textContent = 'flashlight_off';
+    flashBtn.classList.add('active');
+    icon.style.fontVariationSettings = "'FILL' 1";
+  } else {
+    icon.textContent = 'flashlight_on';
+    flashBtn.classList.remove('active');
+    icon.style.fontVariationSettings = "'FILL' 0";
+  }
+});
+
+document.getElementById('galleryBtn').addEventListener('click', () => {
+  // Simulate gallery pick
+  simulateScan('https://github.com/qr-magic/example');
+});
+
+demoScanBtn.addEventListener('click', () => {
+  const demos = [
+    'https://qr-magic.vercel.app',
+    'https://fonts.google.com',
+    'https://developer.mozilla.org/ja/',
+    'WIFI:T:WPA;S:QRMagicNet;P:magic2024;;',
+  ];
+  simulateScan(demos[Math.floor(Math.random() * demos.length)]);
+});
+
+function simulateScan(url) {
+  // Brief flash animation
+  const inner = document.querySelector('.vf-inner');
+  if (inner) {
+    inner.style.background = 'rgba(0,240,255,0.25)';
+    setTimeout(() => inner.style.background = '', 250);
+  }
+
+  scanResultUrl.textContent = url;
+  scanResultToast.classList.add('show');
+
+  // Add to history
+  addToHistory({ type: 'scan', url: url, date: new Date().toISOString() });
+}
+
+document.getElementById('scanOpenBtn').addEventListener('click', () => {
+  const url = scanResultUrl.textContent;
+  if (url.startsWith('http')) window.open(url, '_blank');
+});
+
+document.getElementById('scanCopyBtn').addEventListener('click', () => {
+  navigator.clipboard.writeText(scanResultUrl.textContent).catch(() => {});
+  const btn = document.getElementById('scanCopyBtn');
+  btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px;">check</span>コピー済み';
+  setTimeout(() => {
+    btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px;">content_copy</span>コピー';
+  }, 2000);
+});
+
+document.getElementById('scanCloseToastBtn').addEventListener('click', () => {
+  scanResultToast.classList.remove('show');
+});
+
+/* =============================================
+   RESULT / CUSTOMIZE SCREEN
+============================================= */
+// Color swatches
+document.getElementById('colorSwatches').addEventListener('click', e => {
+  const swatch = e.target.closest('.color-swatch');
+  if (!swatch) return;
+  document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+  swatch.classList.add('selected');
+  state.customOptions.color = swatch.dataset.color;
+  refreshResultQR();
+});
+
+// Dot styles (visual only — QRCodeJS doesn't support shape, but UI is interactive)
+document.getElementById('dotStyles').addEventListener('click', e => {
+  const btn = e.target.closest('.dot-style-btn');
+  if (!btn) return;
+  document.querySelectorAll('.dot-style-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  state.customOptions.dotStyle = btn.dataset.style;
+  // Visual refresh (actual shape would need a custom QR renderer)
+  refreshResultQR();
+});
+
+// Error correction
+document.getElementById('ecGroup').addEventListener('click', e => {
+  const btn = e.target.closest('.ec-btn');
+  if (!btn) return;
+  document.querySelectorAll('.ec-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  state.customOptions.ec = btn.dataset.ec;
+  refreshResultQR();
+});
+
+// Toggles
+function initToggle(id, stateKey) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('click', () => {
+    el.classList.toggle('on');
+    state.customOptions[stateKey] = el.classList.contains('on');
+    if (stateKey === 'showBorder') refreshResultQR();
+  });
+}
+initToggle('toggleLogo',   'showLogo');
+initToggle('toggleBorder', 'showBorder');
+initToggle('toggleVibrate', 'vibrate');
+initToggle('toggleAutoSave', 'autoSave');
+
+// Download
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  const canvas = document.querySelector('#resultQrBox canvas');
+  if (!canvas) return;
+  const link = document.createElement('a');
+  link.download = 'qr-magic.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
+
+// Share
+document.getElementById('shareBtn').addEventListener('click', async () => {
+  const canvas = document.querySelector('#resultQrBox canvas');
+  if (navigator.share && canvas) {
+    canvas.toBlob(async blob => {
+      const file = new File([blob], 'qr-magic.png', { type: 'image/png' });
+      try {
+        await navigator.share({ files: [file], title: 'QR Magic', text: state.qrUrl });
+      } catch(e) {}
+    });
+  } else {
+    navigator.clipboard.writeText(state.qrUrl).catch(() => {});
+    showToast('URLをコピーしました');
+  }
+});
+
+// Copy QR
+document.getElementById('copyQrBtn').addEventListener('click', () => {
+  navigator.clipboard.writeText(state.qrUrl).catch(() => {});
+  showToast('コピーしました ✓');
+});
+
+/* =============================================
+   HISTORY SCREEN
+============================================= */
+function addToHistory(entry) {
+  state.history.unshift({ ...entry, id: Date.now() });
+  if (state.history.length > 50) state.history = state.history.slice(0, 50);
+  saveHistory();
+}
+
+function saveHistory() {
+  localStorage.setItem('qr_history', JSON.stringify(state.history));
+}
+
+function renderHistory(filter = 'all') {
+  const list = document.getElementById('historyList');
+  if (!list) return;
+
+  const filtered = filter === 'all'
+    ? state.history
+    : state.history.filter(h => h.type === filter);
+
+  if (filtered.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <span class="material-symbols-outlined">history_toggle_off</span>
+        <p>履歴がまだありません。<br>QRコードを作成またはスキャンしてみましょう！</p>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(item => {
+    const date = new Date(item.date);
+    const timeStr = `${date.getMonth()+1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2,'0')}`;
+    const typeBadge = item.type === 'create'
+      ? '<span class="history-type-badge badge-create">作成</span>'
+      : '<span class="history-type-badge badge-scan">スキャン</span>';
+    const shortUrl = item.url.length > 30 ? item.url.slice(0, 30) + '…' : item.url;
+
+    return `
+      <div class="history-item" data-id="${item.id}" data-url="${item.url}">
+        <div class="history-qr-thumb" id="hist-thumb-${item.id}"></div>
+        <div class="history-item-info">
+          <p class="history-item-url">${shortUrl}</p>
+          <div class="history-item-meta">
+            <span class="material-symbols-outlined">schedule</span>
+            <span>${timeStr}</span>
+            ${typeBadge}
+          </div>
+        </div>
+        <span class="material-symbols-outlined history-item-action">chevron_right</span>
+      </div>`;
+  }).join('');
+
+  // Generate mini QR thumbnails
+  filtered.forEach(item => {
+    const thumbEl = document.getElementById('hist-thumb-' + item.id);
+    if (thumbEl) {
+      generateQR(thumbEl, item.url, { size: 44, color: '#000000' });
+    }
+  });
+
+  // Click to reuse
+  list.querySelectorAll('.history-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const url = el.dataset.url;
+      urlInput.value = url;
+      state.qrUrl = url;
+      document.getElementById('resultUrlText').textContent = url;
+      refreshResultQR();
+      navigate('result');
+    });
+  });
+}
+
+// Filter chips
+document.querySelectorAll('.filter-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    renderHistory(chip.dataset.filter);
+  });
+});
+
+// Clear history
+document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+  if (confirm('履歴をすべて削除しますか？')) {
+    state.history = [];
+    saveHistory();
+    renderHistory();
+  }
+});
+
+/* =============================================
+   SETTINGS MODAL
+============================================= */
+const settingsModal = document.getElementById('settingsModal');
+
+function openSettings() {
+  settingsModal.classList.add('show');
+}
+function closeSettings() {
+  settingsModal.classList.remove('show');
+}
+
+document.getElementById('settingsBtn').addEventListener('click', openSettings);
+document.getElementById('settingsBtnScan').addEventListener('click', openSettings);
+document.getElementById('closeSettingsBtn').addEventListener('click', closeSettings);
+settingsModal.addEventListener('click', e => {
+  if (e.target === settingsModal) closeSettings();
+});
+
+/* =============================================
+   TOAST NOTIFICATION
+============================================= */
+let toastTimer;
+function showToast(msg) {
+  let toast = document.getElementById('globalToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'globalToast';
+    toast.style.cssText = `
+      position: fixed;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-10px);
+      z-index: 200;
+      background: var(--surface-high);
+      border: 1px solid var(--glass-border);
+      color: var(--on-surface);
+      padding: 10px 22px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+      transition: all 0.3s;
+      opacity: 0;
+      pointer-events: none;
+      white-space: nowrap;
+    `;
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  toast.style.transform = 'translateX(-50%) translateY(0)';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(-50%) translateY(-10px)';
+  }, 2500);
+}
+
+/* =============================================
+   INITIAL HISTORY DATA (demo)
+============================================= */
+if (state.history.length === 0) {
+  const demoItems = [
+    { type: 'create', url: 'https://github.com', date: new Date(Date.now() - 3600000).toISOString() },
+    { type: 'scan',   url: 'https://google.com', date: new Date(Date.now() - 7200000).toISOString() },
+    { type: 'create', url: 'https://developer.mozilla.org/ja/', date: new Date(Date.now() - 86400000).toISOString() },
+    { type: 'scan',   url: 'WIFI:T:WPA;S:HomeNet;P:pass123;;', date: new Date(Date.now() - 172800000).toISOString() },
+    { type: 'create', url: 'https://fonts.google.com', date: new Date(Date.now() - 259200000).toISOString() },
+  ];
+  demoItems.forEach((item, i) => {
+    state.history.push({ ...item, id: Date.now() - i * 1000 });
+  });
+  saveHistory();
+}
+
+/* =============================================
+   INIT
+============================================= */
+navigate('home');
+</script>
+</body>
+</html>
