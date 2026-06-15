@@ -1189,6 +1189,9 @@
 </head>
 <body>
 
+<!-- Hidden file input for image QR scanning -->
+<input type="file" id="imageFileInput" accept="image/*" style="display:none;">
+
 <!-- Ambient background glow -->
 <div class="ambient-bg"></div>
 
@@ -1882,8 +1885,7 @@ flashBtn.addEventListener('click', () => {
 });
 
 document.getElementById('galleryBtn').addEventListener('click', () => {
-  // Simulate gallery pick
-  simulateScan('https://github.com');
+  document.getElementById('imageFileInput').click();
 });
 
 demoScanBtn.addEventListener('click', () => {
@@ -1912,8 +1914,40 @@ function simulateScan(url) {
 }
 
 document.getElementById('scanOpenBtn').addEventListener('click', () => {
-  const url = scanResultUrl.textContent;
-  if (url.startsWith('http')) window.open(url, '_blank');
+  document.getElementById('imageFileInput').click();
+});
+
+// Image file QR decoding
+document.getElementById('imageFileInput').addEventListener('change', function() {
+  const file = this.files[0];
+  if (!file) return;
+  this.value = '';
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      if (typeof jsQR !== 'undefined') {
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+        if (code) {
+          simulateScan(code.data);
+        } else {
+          showToast('QRコードが見つかりませんでした');
+        }
+      } else {
+        showToast('QRデコーダーが読み込めませんでした');
+      }
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
 });
 
 document.getElementById('scanCopyBtn').addEventListener('click', () => {
