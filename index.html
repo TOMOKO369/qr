@@ -1936,25 +1936,62 @@ initToggle('toggleAutoSave', 'autoSave');
 
 // Download
 document.getElementById('downloadBtn').addEventListener('click', () => {
+  // Try to find canvas or img
   const canvas = document.querySelector('#resultQrBox canvas');
-  if (!canvas) return;
-  const link = document.createElement('a');
-  link.download = 'qr-magic.png';
-  link.href = canvas.toDataURL('image/png');
-  link.click();
+  const img = document.querySelector('#resultQrBox img');
+  
+  if (canvas) {
+    try {
+      const link = document.createElement('a');
+      link.download = 'qr-magic.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch(e) {
+      showToast('ダウンロードに失敗しました');
+      console.error('Download error:', e);
+    }
+  } else if (img) {
+    try {
+      const link = document.createElement('a');
+      link.download = 'qr-magic.png';
+      link.href = img.src;
+      link.click();
+    } catch(e) {
+      showToast('ダウンロードに失敗しました');
+      console.error('Download error:', e);
+    }
+  } else {
+    showToast('QRコードの生成に失敗しています');
+  }
 });
 
 // Share
 document.getElementById('shareBtn').addEventListener('click', async () => {
   const canvas = document.querySelector('#resultQrBox canvas');
-  if (navigator.share && canvas) {
-    canvas.toBlob(async blob => {
-      const file = new File([blob], 'qr-magic.png', { type: 'image/png' });
-      try {
-        await navigator.share({ files: [file], title: 'QR Magic', text: state.qrUrl });
-      } catch(e) {}
-    });
+  const img = document.querySelector('#resultQrBox img');
+  
+  if (navigator.share) {
+    try {
+      if (canvas) {
+        canvas.toBlob(async blob => {
+          const file = new File([blob], 'qr-magic.png', { type: 'image/png' });
+          try {
+            await navigator.share({ files: [file], title: 'QR Magic', text: state.qrUrl });
+          } catch(e) {
+            console.log('Share cancelled or failed:', e);
+          }
+        });
+      } else {
+        // Fallback to URL share
+        await navigator.share({ title: 'QR Magic', text: state.qrUrl, url: state.qrUrl });
+      }
+    } catch(e) {
+      console.error('Share error:', e);
+      navigator.clipboard.writeText(state.qrUrl).catch(() => {});
+      showToast('URLをコピーしました');
+    }
   } else {
+    // Fallback for browsers without share API
     navigator.clipboard.writeText(state.qrUrl).catch(() => {});
     showToast('URLをコピーしました');
   }
